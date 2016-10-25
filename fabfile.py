@@ -85,7 +85,7 @@ def backup_apps():
         regex = re.compile(r"(:\s+)")
         config = [re.sub(regex, '=', e) for e in envs if e]
         
-        apps_backup[app_name] = {DOMAINS_KEY: app_domains, "conf": config}
+        apps_backup[app_name] = {DOMAINS_KEY: app_domains, ENVS_KEY: config}
     
     return apps_backup
 
@@ -190,12 +190,20 @@ def import_config(file, dry_run=False):
 
 def import_apps(config, is_debug):
     for name, settings in config.iteritems():
-        dokku_run("apps:create", name, is_debug=is_debug)
-        for d in settings.get(DOMAINS_KEY, []):
-            dokku_run("domains:add", name, d, is_debug=is_debug)
+        # dokku_run("apps:create", name, is_debug=is_debug)
+        # import_domains(is_debug, name, settings)
+        
+        import_envs(is_debug, name, settings)
 
-        envs = settings.get(ENVS_KEY, None)
-        ignore_envs = {'DOKKU_DOCKERFILE_CMD'}
-        if envs:
-            env_str = " ".join([e for e in envs if e.split("=",1)[0] not in ignore_envs])
-            dokku_run("config:set", name, env_str, is_debug=is_debug)
+
+def import_envs(is_debug, name, settings):
+    envs = settings.get(ENVS_KEY, None)
+    ignore_envs = {'DOKKU_DOCKERFILE_CMD'}
+    if envs:
+        env_str = " ".join([e for e in envs if e.split("=", 1)[0] not in ignore_envs])
+        dokku_run("config:set", name, env_str, is_debug=is_debug)
+
+
+def import_domains(is_debug, name, settings):
+    for d in settings.get(DOMAINS_KEY, []):
+        dokku_run("domains:add", name, d, is_debug=is_debug)
