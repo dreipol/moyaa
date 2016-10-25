@@ -6,8 +6,10 @@ import re
 
 from fabric.api import run, env
 from fabric.colors import red, green
+from fabric.context_managers import settings
+from fabric.contrib.files import exists
 from fabric.decorators import task
-from fabric.operations import prompt, sudo
+from fabric.operations import prompt, sudo, put, get
 
 ENVS_KEY = "envs"
 DOMAINS_KEY = "domains"
@@ -60,12 +62,59 @@ def destination_host(host_address=None, host=dest_host()):
         host_address = host.complete_address()
     
     env.host_string = host_address
+    env.forward_agent = True
 
 
 @task(alias='cp_ssh')
 def copy_authorized_keys(destination=dest_host().complete_address()):
     keys = "~/.ssh/authorized_keys"
     run("scp {keys} {server}:{keys}".format(keys=keys, server=destination))
+
+
+@task
+def create_ssh_login(destination=dest_host().complete_address()):
+    print(destination)
+    path = "~/.ssh/id_rsa"
+    local_file = "id_rsa_{}.pub".format(get_current_host_name())
+    pub_file = path + ".pub"
+    if not exists(pub_file):
+        run("ssh-keygen -t rsa -f {} -q -N \"\"".format(path))
+    get(pub_file, local_file)
+    
+    with settings(host_string=destination):
+        remote_filepath = "~/.ssh/{}".format(local_file)
+        if not exists(remote_filepath):
+            put(local_file, remote_filepath)
+            run("cat {} >> ~/.ssh/authorized_keys".format(remote_filepath))
+        run("cat {} | sudo sshcommand acl-add dokku {}".format(remote_filepath, get_current_host_name()))
+
+
+def remote_app_path(app):
+    return "/home/dokku/{}".format(app)
+
+
+@task()
+def get_nginx_files():
+    all_apps = get_apps()
+    for app in all_apps:
+        path = remote_app_path(app) + "/nginx.conf.d/"
+        if exists(path):
+            get(path, "nginx_conf/{}".format(app))
+
+
+@task()
+def put_nginx_files():
+    conf_dir = "nginx_conf"
+    for app in os.listdir(conf_dir):
+        local_path = "{}/{}/*".format(conf_dir, app)
+        put(local_path, remote_app_path(app), use_sudo=True)
+
+
+@task(alias='cp_nginx')
+def copy_nginx_files(destination=dest_host().complete_address()):
+    get_nginx_files()
+    with settings(host_string=destination):
+        put_nginx_files()
 
 
 def backup_apps():
@@ -113,8 +162,7 @@ def get_apps():
 
 @task(alias="backup")
 def download_config():
-    regex = re.compile(ur"^(?:\w*@){0,1}(\w+).")
-    host_name = re.search(regex, env.host_string).groups()[0]
+    host_name = get_current_host_name()
     filename = "dokku_backup_{0}.json".format(host_name)
     should_overwrite = True
     if os.path.exists(filename):
@@ -134,6 +182,12 @@ def download_config():
         print(green("\nBackup saved to: {}".format(filename)))
     else:
         print(red("backup has been cancelled"))
+
+
+def get_current_host_name():
+    regex = re.compile(ur"^(?:\w*@){0,1}(\w+).")
+    host_name = re.search(regex, env.host_string).groups()[0]
+    return host_name
 
 
 def bool_prompt(message):
@@ -192,7 +246,6 @@ def import_apps(config, is_debug):
     for name, settings in config.iteritems():
         dokku_run("apps:create", name, is_debug=is_debug)
         import_domains(is_debug, name, settings)
-        
         import_envs(is_debug, name, settings)
 
 
