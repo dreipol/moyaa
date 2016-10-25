@@ -160,11 +160,11 @@ def import_plugins(plugins_dict, is_debug=False):
         if not name in installed_plugins and properties["is_enabled"]:
             print(name)
             # dokku_run("plugin:install", name, as_sudo=True, is_debug=is_debug)
-    prompt("\n\nI have installed the plugins manually. \nProceed?")
+    return bool_prompt("\n\nI have installed the plugins manually. \nProceed?")
 
 
 @task(alias="import")
-def import_config(file):
+def import_config(file, dry_run=False):
     if not os.path.exists(file):
         print(red("Cannot find file: {}".format(file)))
         return
@@ -175,12 +175,12 @@ def import_config(file):
         print(red("This host already contains apps."))
         should_import = bool_prompt(red("Do you REALLY want to import the backup? yes/no"))
     
-    is_debug = True
     if should_import:
         with open(file, "r") as json_file:
             config = json.load(json_file)
-            import_plugins(config.get("plugins", {}), is_debug)
-            import_apps(config.get("apps", {}), is_debug)
+            should_proceed = import_plugins(config.get("plugins", {}), dry_run)
+            if should_proceed:
+                import_apps(config.get("apps", {}), dry_run)
 
 
 def import_apps(config, is_debug):
