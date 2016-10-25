@@ -12,3 +12,8 @@ Moving dokku installations
 There is also a dry run for the import script which just prints the methods:
 
 `fab dest:user@my-new.server.com import:import:file=dokku_backup_my.json,dry_run=1`
+
+
+## License
+
+See the [LICENSE](LICENSE.md) file for license rights and limitations (MIT).
