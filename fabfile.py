@@ -37,7 +37,7 @@ dest_host = lambda: Host("DEST")
 src_host = lambda: Host("SRC")
 
 
-@task()
+@task(alias="src")
 def source_host(host_address=None, host=src_host()):
     """
 
@@ -51,7 +51,7 @@ def source_host(host_address=None, host=src_host()):
     env.forward_agent = True
 
 
-@task()
+@task(alias="dest")
 def destination_host(host_address=None, host=dest_host()):
     if not host_address:
         host_address = host.complete_address()
@@ -62,7 +62,7 @@ def destination_host(host_address=None, host=dest_host()):
 @task(alias='cp_ssh')
 def copy_authorized_keys(destination=dest_host().complete_address()):
     keys = "~/.ssh/authorized_keys"
-    run("scp {keys} {server}:{keys}".format(keys=keys, server=destination.address))
+    run("scp {keys} {server}:{keys}".format(keys=keys, server=destination))
 
 
 def backup_apps():
