@@ -91,8 +91,8 @@ def backup_apps():
 
 
 def backup_plugins():
-    print(green("Backup plugins:"))
-    response = dokku_run("plugin")
+    print(green("Backup plugins"))
+    response = dokku_run("plugin", quiet=True)
     plugins = response.splitlines()[1:]
     plugins_backup = {}
     for plugin in plugins:
