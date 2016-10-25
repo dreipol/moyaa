@@ -9,6 +9,9 @@ from fabric.colors import red, green
 from fabric.decorators import task
 from fabric.operations import prompt, sudo
 
+ENVS_KEY = "envs"
+DOMAINS_KEY = "domains"
+
 
 class Host(object):
     def __init__(self, kind, address=None, user="ubuntu"):
@@ -66,6 +69,7 @@ def copy_authorized_keys(destination=dest_host().complete_address()):
 
 
 def backup_apps():
+    print(green("Backup apps:"))
     all_apps = get_apps()
     apps_backup = dict()
     for app_name in all_apps:
@@ -79,14 +83,15 @@ def backup_apps():
         envs = envs.splitlines()
         
         regex = re.compile(r"(:\s+)")
-        config = " ".join([re.sub(regex, '=', e) for e in envs if e])
+        config = [re.sub(regex, '=', e) for e in envs if e]
         
-        apps_backup[app_name] = {"domains": app_domains, "conf": config}
+        apps_backup[app_name] = {DOMAINS_KEY: app_domains, "conf": config}
     
     return apps_backup
 
 
 def backup_plugins():
+    print(green("Backup plugins:"))
     response = dokku_run("plugin")
     plugins = response.splitlines()[1:]
     plugins_backup = {}
@@ -186,9 +191,11 @@ def import_config(file, dry_run=False):
 def import_apps(config, is_debug):
     for name, settings in config.iteritems():
         dokku_run("apps:create", name, is_debug=is_debug)
-        for d in settings.get("domains", []):
+        for d in settings.get(DOMAINS_KEY, []):
             dokku_run("domains:add", name, d, is_debug=is_debug)
-        
-        conf = settings.get("conf", None)
-        if conf:
-            dokku_run("config:set", name, conf, is_debug=is_debug)
+
+        envs = settings.get(ENVS_KEY, None)
+        ignore_envs = {'DOKKU_DOCKERFILE_CMD'}
+        if envs:
+            env_str = " ".join([e for e in envs if e.split("=",1)[0] not in ignore_envs])
+            dokku_run("config:set", name, env_str, is_debug=is_debug)
