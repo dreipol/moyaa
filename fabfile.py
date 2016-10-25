@@ -33,35 +33,36 @@ class Host(object):
         return self.complete_address()
 
 
-dest_host = Host("DEST")
-src_host = Host("SRC")
+dest_host = lambda: Host("DEST")
+src_host = lambda: Host("SRC")
 
 
 @task()
-def source_host(host=None):
+def source_host(host_address=None, host=src_host()):
     """
 
     :type host: Host
     """
-    if not host:
-        host = src_host
     
-    env.host_string = host.complete_address()
+    if not host_address:
+        host_address = host.complete_address()
+    
+    env.host_string = host_address
     env.forward_agent = True
 
 
 @task()
-def destination_host(host=None):
-    if not host:
-        host = dest_host
+def destination_host(host_address=None, host=dest_host()):
+    if not host_address:
+        host_address = host.complete_address()
     
-    env.host_string = host.complete_address()
+    env.host_string = host_address
 
 
 @task(alias='cp_ssh')
-def copy_authorized_keys():
+def copy_authorized_keys(destination=dest_host().complete_address()):
     keys = "~/.ssh/authorized_keys"
-    run("scp {keys} {user}@{server}:{keys}".format(keys=keys, user=dest_host.user, server=dest_host.address))
+    run("scp {keys} {server}:{keys}".format(keys=keys, server=destination.address))
 
 
 def backup_apps():
@@ -105,7 +106,7 @@ def get_apps():
     return all_apps
 
 
-@task()
+@task(alias="backup")
 def download_config():
     regex = re.compile(ur"^(?:\w*@){0,1}(\w+).")
     host_name = re.search(regex, env.host_string).groups()[0]
@@ -136,7 +137,6 @@ def bool_prompt(message):
 
 
 def dokku_run(method, app_name=None, dokku_arg=None, is_debug=False, as_sudo=False, **kwargs):
-    
     if is_debug:
         r = print
         kwargs = {}
@@ -162,7 +162,8 @@ def import_plugins(plugins_dict, is_debug=False):
             # dokku_run("plugin:install", name, as_sudo=True, is_debug=is_debug)
     prompt("\n\nI have installed the plugins manually. \nProceed?")
 
-@task
+
+@task(alias="import")
 def import_config(file):
     if not os.path.exists(file):
         print(red("Cannot find file: {}".format(file)))
