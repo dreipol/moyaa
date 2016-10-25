@@ -190,8 +190,8 @@ def import_config(file, dry_run=False):
 
 def import_apps(config, is_debug):
     for name, settings in config.iteritems():
-        # dokku_run("apps:create", name, is_debug=is_debug)
-        # import_domains(is_debug, name, settings)
+        dokku_run("apps:create", name, is_debug=is_debug)
+        import_domains(is_debug, name, settings)
         
         import_envs(is_debug, name, settings)
 
